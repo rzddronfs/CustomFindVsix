@@ -1,13 +1,14 @@
-﻿using System;
+﻿//------------------------------------------------------------------------------
+// <copyright file="FindEntriesCmds.cs" company="Dronfs">
+//     Copyright (c) Dronfs.  All rights reserved.
+// </copyright>
+//------------------------------------------------------------------------------
+
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
-using System.Globalization;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
-using Task = System.Threading.Tasks.Task;
-using Dispatcher = System.Windows.Threading.Dispatcher;
 
 
 namespace CustomFindVsix
@@ -15,7 +16,7 @@ namespace CustomFindVsix
   /// <summary>
   /// Command handler
   /// </summary>
-  internal sealed class FindEntriesCmd
+  internal sealed class FindEntriesCmds
   {
     /// <summary>
     /// Command ID.
@@ -26,12 +27,12 @@ namespace CustomFindVsix
     /// <summary>
     /// Command menu group (command set GUID).
     /// </summary>
-    public static readonly Guid CommandSet = new Guid("a3490c9f-4115-4d25-b99c-17c6951f68db");
+    public static readonly Guid CommandSet = new Guid("9965b1e1-829a-4194-bbf6-a535f6a2e51f");
 
     /// <summary>
     /// VS Package that provides this command, not null.
     /// </summary>
-    private readonly AsyncPackage package;
+    private readonly Package package;
 
     private readonly int[] Cmds = new[] { ProjectScopeId, DocumentScopeId };
     private readonly Dictionary<int, Runnable> ExecOptions;
@@ -39,12 +40,11 @@ namespace CustomFindVsix
     private delegate void Runnable(object sender, EventArgs e);
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="FindEntriesCmd"/> class.
+    /// Initializes a new instance of the <see cref="FindEntriesCmds"/> class.
     /// Adds our command handlers for menu (commands must exist in the command table file)
     /// </summary>
     /// <param name="package">Owner package, not null.</param>
-    /// <param name="commandService">Command service to add command to, not null.</param>
-    private FindEntriesCmd(AsyncPackage package, OleMenuCommandService commandService)
+    private FindEntriesCmds(Package package, OleMenuCommandService commandService)
     {
       if (package == null)
         throw new ArgumentNullException();
@@ -55,10 +55,10 @@ namespace CustomFindVsix
       this.package = package;
 
       ExecOptions = new Dictionary<int, Runnable>
-      {
-        {ProjectScopeId, ExecuteOnProject},
-        {DocumentScopeId, ExecuteOnDocument},
-      };
+        {
+          {ProjectScopeId, ExecuteOnProject},
+          {DocumentScopeId, ExecuteOnDocument},
+        };
 
       System.Diagnostics.Debug.Assert(ExecOptions.Count == Cmds.Length);
 
@@ -66,11 +66,10 @@ namespace CustomFindVsix
       {
         var menuCommandID = new CommandID(CommandSet, cmdId);
         MenuCommand menuItem = new MenuCommand(
-          (s, e) => 
+          (s, e) =>
           {
-            Dispatcher.CurrentDispatcher.VerifyAccess();
-            Execute(cmdId, s, e); 
-          }, 
+            Execute(cmdId, s, e);
+          },
           menuCommandID
         );
         commandService.AddCommand(menuItem);
@@ -80,7 +79,7 @@ namespace CustomFindVsix
     /// <summary>
     /// Gets the instance of the command.
     /// </summary>
-    public static FindEntriesCmd Instance
+    public static FindEntriesCmds Instance
     {
       get;
       private set;
@@ -89,7 +88,7 @@ namespace CustomFindVsix
     /// <summary>
     /// Gets the service provider from the owner package.
     /// </summary>
-    private Microsoft.VisualStudio.Shell.IAsyncServiceProvider ServiceProvider
+    private IServiceProvider ServiceProvider
     {
       get
       {
@@ -101,14 +100,12 @@ namespace CustomFindVsix
     /// Initializes the singleton instance of the command.
     /// </summary>
     /// <param name="package">Owner package, not null.</param>
-    public static async Task InitializeAsync(AsyncPackage package)
+    public static void Initialize(Package package)
     {
-      // Switch to the main thread - the call to AddCommand in FindEntriesCmd's constructor requires
-      // the UI thread.
-      await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(package.DisposalToken);
-
-      OleMenuCommandService commandService = await package.GetServiceAsync((typeof(IMenuCommandService))) as OleMenuCommandService;
-      Instance = new FindEntriesCmd(package, commandService);
+      OleMenuCommandService commandService = 
+        (package as IServiceProvider).GetService(typeof(IMenuCommandService)) as OleMenuCommandService;
+      
+      Instance = new FindEntriesCmds(package, commandService);
     }
 
     /// <summary>
@@ -116,9 +113,10 @@ namespace CustomFindVsix
     /// See the constructor to see how the menu item is associated with this function using
     /// OleMenuCommandService service and MenuCommand class.
     /// </summary>
+    /// <param name="cmdId">Command id.</param>
     /// <param name="sender">Event sender.</param>
     /// <param name="e">Event args.</param>
-    private void Execute( int cmdId, object sender, EventArgs e)
+    private void Execute(int cmdId, object sender, EventArgs e)
     {
       ThreadHelper.ThrowIfNotOnUIThread();
       var dte = Package.GetGlobalService(typeof(SDTE)) as EnvDTE._DTE;
